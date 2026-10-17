@@ -10,7 +10,9 @@ COPY prisma ./prisma/
 RUN npm ci
 
 COPY tsconfig.json ./
+COPY vite.config.ts ./
 COPY src ./src/
+COPY frontend ./frontend/
 COPY public ./public/
 
 RUN npm run prisma:generate
