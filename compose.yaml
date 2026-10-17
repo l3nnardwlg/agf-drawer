@@ -1,0 +1,12 @@
+services:
+  drawer:
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      DATA_DIR: /app/data
+    volumes:
+      - drawer_data:/app/data
+    restart: unless-stopped
+volumes:
+  drawer_data:
