@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { ActiveView, CableItem, CableUnit, StorageLocation, MovementItem } from './types';
+import { AppRoute, ActiveView, CableItem, CableUnit, StorageLocation, MovementItem, UserSession } from './types';
 import { initialCables, initialStorageLocations, initialMovements } from './data/mockData';
 
-// Components
+// Public SaaS Views
+import { LandingPageView } from './views/LandingPageView';
+import { FeaturesPageView } from './views/FeaturesPageView';
+import { PricingPageView } from './views/PricingPageView';
+import { AuthPageView } from './views/AuthPageView';
+
+// Dashboard Components
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { MobileNavbar } from './components/MobileNavbar';
@@ -11,7 +17,7 @@ import { AddCableModal } from './components/AddCableModal';
 import { ReturnCableModal } from './components/ReturnCableModal';
 import { ConnectorCatalogModal } from './components/ConnectorCatalogModal';
 
-// Views
+// Dashboard Views
 import { OverviewView } from './views/OverviewView';
 import { CableFinderView } from './views/CableFinderView';
 import { CableDetailView } from './views/CableDetailView';
@@ -23,6 +29,21 @@ import { SettingsView } from './views/SettingsView';
 import { DesignSystemView } from './views/DesignSystemView';
 
 export const App: React.FC = () => {
+  // SaaS URL Route State
+  const parseCurrentRoute = (): AppRoute => {
+    const path = window.location.pathname;
+    if (path.startsWith('/dashboard')) return 'dashboard';
+    if (path === '/login') return 'login';
+    if (path === '/register') return 'register';
+    if (path === '/features') return 'features';
+    if (path === '/pricing') return 'pricing';
+    return 'landing';
+  };
+
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(parseCurrentRoute);
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
+
+  // Dashboard Sub-View State
   const [activeView, setActiveView] = useState<ActiveView>('overview');
   const [selectedCable, setSelectedCable] = useState<CableItem | null>(null);
   const [isLightMode, setIsLightMode] = useState<boolean>(false);
@@ -42,10 +63,45 @@ export const App: React.FC = () => {
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [catalogSide, setCatalogSide] = useState<'A' | 'B'>('A');
 
+  // Handle Route Navigation with Browser History
+  const navigateRoute = (route: AppRoute) => {
+    setCurrentRoute(route);
+    let path = '/';
+    if (route === 'dashboard') path = '/dashboard';
+    else if (route === 'login') path = '/login';
+    else if (route === 'register') path = '/register';
+    else if (route === 'features') path = '/features';
+    else if (route === 'pricing') path = '/pricing';
+
+    window.history.pushState({ route }, '', path);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentRoute(parseCurrentRoute());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Try fetching from backend API if available
   useEffect(() => {
     const fetchBackendData = async () => {
       try {
+        const meRes = await fetch('/api/v1/me');
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData.user) {
+            setCurrentUser({
+              id: meData.user.id,
+              email: meData.user.email,
+              username: meData.user.username,
+              displayName: meData.user.displayName,
+            });
+          }
+        }
+
         const res = await fetch('/api/v1/workspaces');
         if (res.ok) {
           const wsData = await res.json();
@@ -55,7 +111,6 @@ export const App: React.FC = () => {
             if (itemsRes.ok) {
               const invData = await itemsRes.json();
               if (invData.items && invData.items.length > 0) {
-                // Map backend items to frontend CableItem
                 const mapped: CableItem[] = invData.items.map((item: any) => ({
                   id: item.id,
                   name: item.name,
@@ -139,7 +194,6 @@ export const App: React.FC = () => {
       })
     );
 
-    // Update selectedCable if currently viewing it
     if (selectedCable) {
       setSelectedCable((prev) => {
         if (!prev) return null;
@@ -162,14 +216,13 @@ export const App: React.FC = () => {
       });
     }
 
-    // Add movement
     const newMovement: MovementItem = {
       id: 'mov-' + Date.now(),
       action: 'return',
       title: `${returnCableName || 'Kabel'} ins Lager zurückgebucht`,
       item_name: returnCableName,
       to: locName,
-      user_initials: 'LW',
+      user_initials: currentUser?.displayName ? currentUser.displayName.slice(0, 2).toUpperCase() : 'LW',
       timestamp: 'gerade eben',
       date_group: 'Heute, 17. Oktober 2026',
     };
@@ -272,14 +325,13 @@ export const App: React.FC = () => {
 
     setCables((prev) => [newCable, ...prev]);
 
-    // Add movement entry
     const newMovement: MovementItem = {
       id: 'mov-' + Date.now(),
       action: 'create',
       title: `${newCable.name} (${initialCount}x) neu erfasst`,
       item_name: newCable.name,
       to: locName,
-      user_initials: 'LW',
+      user_initials: currentUser?.displayName ? currentUser.displayName.slice(0, 2).toUpperCase() : 'LW',
       timestamp: 'gerade eben',
       date_group: 'Heute, 17. Oktober 2026',
     };
@@ -356,6 +408,51 @@ export const App: React.FC = () => {
     }
   };
 
+  // 1. Public Landing Page
+  if (currentRoute === 'landing') {
+    return (
+      <LandingPageView
+        onNavigateRoute={navigateRoute}
+        onOpenDashboard={() => navigateRoute('dashboard')}
+      />
+    );
+  }
+
+  // 2. Public Features Deep-Dive
+  if (currentRoute === 'features') {
+    return (
+      <FeaturesPageView
+        onNavigateRoute={navigateRoute}
+        onOpenDashboard={() => navigateRoute('dashboard')}
+      />
+    );
+  }
+
+  // 3. Public Pricing Page
+  if (currentRoute === 'pricing') {
+    return (
+      <PricingPageView
+        onNavigateRoute={navigateRoute}
+        onOpenDashboard={() => navigateRoute('dashboard')}
+      />
+    );
+  }
+
+  // 4. Auth Pages (Login / Register)
+  if (currentRoute === 'login' || currentRoute === 'register') {
+    return (
+      <AuthPageView
+        initialMode={currentRoute === 'register' ? 'register' : 'login'}
+        onNavigateRoute={navigateRoute}
+        onAuthSuccess={(session) => {
+          setCurrentUser(session);
+          navigateRoute('dashboard');
+        }}
+      />
+    );
+  }
+
+  // 5. SaaS Production Dashboard (/dashboard)
   return (
     <div className={`min-h-screen flex ${isLightMode ? 'bg-[#F9F9FB] text-neutral-900' : 'bg-black text-white'}`}>
       {/* Desktop Sidebar */}
@@ -371,6 +468,7 @@ export const App: React.FC = () => {
             inUseCount: cables.reduce((acc, c) => acc + c.inUse, 0),
             storageCount: storageLocations.length,
           }}
+          currentWorkspace={currentUser?.workspaceName || 'AGF Studios'}
         />
       </div>
 
@@ -388,6 +486,7 @@ export const App: React.FC = () => {
             setCatalogSide('A');
             setIsCatalogOpen(true);
           }}
+          onNavigateLanding={() => navigateRoute('landing')}
         />
 
         {/* View Viewport */}

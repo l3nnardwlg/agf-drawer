@@ -74,6 +74,14 @@ export interface ConnectorInfo {
   isCustom?: boolean;
 }
 
+export type AppRoute =
+  | 'landing'
+  | 'features'
+  | 'pricing'
+  | 'login'
+  | 'register'
+  | 'dashboard';
+
 export type ActiveView =
   | 'overview'
   | 'cable-finder'
@@ -84,3 +92,12 @@ export type ActiveView =
   | 'movements'
   | 'settings'
   | 'design-system';
+
+export interface UserSession {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string;
+  role?: string;
+  workspaceName?: string;
+}

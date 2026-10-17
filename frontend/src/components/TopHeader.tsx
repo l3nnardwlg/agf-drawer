@@ -10,6 +10,7 @@ interface TopHeaderProps {
   isLightMode: boolean;
   onToggleLightMode: () => void;
   onOpenCatalogModal?: () => void;
+  onNavigateLanding?: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -20,12 +21,22 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   isLightMode,
   onToggleLightMode,
   onOpenCatalogModal,
+  onNavigateLanding,
 }) => {
   return (
     <header className="h-16 border-b border-neutral-800/80 bg-black/90 backdrop-blur-md px-6 flex items-center justify-between shrink-0 sticky top-0 z-10">
       {/* Left Breadcrumbs */}
       <div className="flex items-center gap-2 text-xs font-mono">
-        <span className="text-neutral-500">AGF Drawer</span>
+        {onNavigateLanding ? (
+          <button
+            onClick={onNavigateLanding}
+            className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5 font-semibold"
+          >
+            <span>← Website</span>
+          </button>
+        ) : (
+          <span className="text-neutral-500">AGF Drawer</span>
+        )}
         <span className="text-neutral-700">/</span>
         {breadcrumbs.map((b, i) => (
           <React.Fragment key={b}>

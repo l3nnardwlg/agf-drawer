@@ -124,6 +124,20 @@ export async function buildApp(): Promise<FastifyInstance> {
       root: publicDir,
       prefix: '/',
     });
+
+    // SPA wildcard fallback for client-side routing (/dashboard, /login, /features, /pricing)
+    app.setNotFoundHandler((request, reply) => {
+      const url = request.raw.url || '';
+      if (url.startsWith('/api') || url.startsWith('/docs')) {
+        return reply.status(404).send({
+          error: {
+            code: 'NOT_FOUND',
+            message: `Route ${request.method}:${request.url} not found`,
+          },
+        });
+      }
+      return reply.sendFile('index.html');
+    });
   }
 
   // Global Session Parser
