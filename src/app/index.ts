@@ -7,6 +7,7 @@ import fastifyStatic from '@fastify/static';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ZodError } from 'zod';
 
@@ -112,13 +113,18 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   });
 
-  // Serve static public folder for existing MVP frontend
+  // Serve static public folder for frontend
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const publicDir = path.resolve(currentDir, '../../public');
-  await app.register(fastifyStatic, {
-    root: publicDir,
-    prefix: '/',
-  });
+  let publicDir = path.resolve(process.cwd(), 'public');
+  if (!fs.existsSync(publicDir)) {
+    publicDir = path.resolve(currentDir, currentDir.includes('dist') ? '../../../public' : '../../public');
+  }
+  if (fs.existsSync(publicDir)) {
+    await app.register(fastifyStatic, {
+      root: publicDir,
+      prefix: '/',
+    });
+  }
 
   // Global Session Parser
   app.addHook('preHandler', parseSession);
