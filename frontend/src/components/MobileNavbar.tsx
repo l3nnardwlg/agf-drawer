@@ -13,12 +13,14 @@ interface MobileNavbarProps {
   activeView: ActiveView;
   onNavigate: (view: ActiveView) => void;
   onOpenAddModal: () => void;
+  isLightMode?: boolean;
 }
 
 export const MobileNavbar: React.FC<MobileNavbarProps> = ({
   activeView,
   onNavigate,
   onOpenAddModal,
+  isLightMode = false,
 }) => {
   const items: { id: ActiveView; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Übersicht', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -29,7 +31,13 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({
   ];
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-neutral-950/95 backdrop-blur-lg border-t border-neutral-800 z-30 px-3 py-1 flex items-center justify-around safe-area-pb">
+    <div
+      className={`md:hidden fixed bottom-0 left-0 right-0 z-30 px-3 py-1 flex items-center justify-around safe-area-pb border-t backdrop-blur-lg transition-colors ${
+        isLightMode
+          ? 'bg-white/95 border-neutral-200 text-neutral-900 shadow-md'
+          : 'bg-neutral-950/95 border-neutral-800 text-white'
+      }`}
+    >
       {items.map((item) => {
         const isActive = activeView === item.id;
         return (
@@ -37,7 +45,11 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({
             key={item.id}
             onClick={() => onNavigate(item.id)}
             className={`flex flex-col items-center py-1.5 px-3 rounded-lg transition-colors ${
-              isActive ? 'text-[#0057FF]' : 'text-neutral-400 hover:text-white'
+              isActive
+                ? 'text-[#0057FF] font-semibold'
+                : isLightMode
+                ? 'text-neutral-500 hover:text-neutral-900'
+                : 'text-neutral-400 hover:text-white'
             }`}
           >
             {item.icon}

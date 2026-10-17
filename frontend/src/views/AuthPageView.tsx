@@ -9,7 +9,9 @@ import {
   ArrowRight,
   AlertCircle,
   CheckCircle2,
-  KeyRound
+  KeyRound,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { AppRoute, UserSession } from '../types';
 
@@ -27,6 +29,7 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [workspaceName, setWorkspaceName] = useState('AGF Studios');
@@ -40,75 +43,116 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    const cleanEmail = email.trim();
+    const cleanPassword = password;
+
     try {
       if (mode === 'login') {
+        // Fastify login schema expects: { login: string, password: string }
         const res = await fetch('/api/v1/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: email, password }),
+          body: JSON.stringify({
+            login: cleanEmail,
+            password: cleanPassword,
+          }),
         });
 
+        const data = await res.json().catch(() => ({}));
+
         if (res.ok) {
-          const data = await res.json();
-          onAuthSuccess({
-            id: data.user?.id || 'usr-1',
-            email: data.user?.email || email,
-            username: data.user?.username || 'user',
-            displayName: data.user?.displayName || 'Studio Member',
-            workspaceName: 'AGF Studios',
-          });
+          const session: UserSession = {
+            id: data.user?.id || 'usr-' + Date.now(),
+            email: data.user?.email || cleanEmail,
+            username: data.user?.username || cleanEmail.split('@')[0],
+            displayName: data.user?.displayName || cleanEmail.split('@')[0],
+            role: data.user?.role || 'Owner',
+            workspaceName: data.primaryWorkspaceId ? 'Mein Workspace' : 'AGF Studios',
+          };
+          localStorage.setItem('agf_drawer_user', JSON.stringify(session));
+          onAuthSuccess(session);
           onNavigateRoute('dashboard');
         } else {
-          const errData = await res.json().catch(() => ({}));
-          setErrorMessage(errData.error?.message || 'Ungültige Anmeldedaten. Bitte prüfe E-Mail und Passwort.');
+          setErrorMessage(
+            data.error?.message ||
+              'Ungültige Anmeldedaten. Bitte prüfe deine E-Mail / Benutzername und dein Passwort.'
+          );
         }
       } else {
+        // Password validation: min 8, uppercase, lowercase, number
+        const hasUpper = /[A-Z]/.test(cleanPassword);
+        const hasLower = /[a-z]/.test(cleanPassword);
+        const hasNumber = /[0-9]/.test(cleanPassword);
+
+        if (cleanPassword.length < 8 || !hasUpper || !hasLower || !hasNumber) {
+          setErrorMessage(
+            'Das Passwort muss mindestens 8 Zeichen lang sein und mind. einen Großbuchstaben, einen Kleinbuchstaben und eine Zahl enthalten.'
+          );
+          setIsLoading(false);
+          return;
+        }
+
+        const safeUsername = (username || cleanEmail.split('@')[0])
+          .trim()
+          .replace(/[^a-zA-Z0-9_-]/g, '_');
+
         const res = await fetch('/api/v1/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email,
-            password,
-            username: username || email.split('@')[0],
-            displayName: displayName || username || 'Studio User',
-            workspaceName: workspaceName || 'Mein Workspace',
+            email: cleanEmail,
+            password: cleanPassword,
+            username: safeUsername,
+            displayName: (displayName || safeUsername).trim(),
+            workspaceName: (workspaceName || 'AGF Studios').trim(),
           }),
         });
 
+        const data = await res.json().catch(() => ({}));
+
         if (res.ok) {
           setSuccessMessage('Konto erfolgreich erstellt! Du wirst zum Dashboard weitergeleitet...');
+          const session: UserSession = {
+            id: data.user?.id || 'usr-' + Date.now(),
+            email: data.user?.email || cleanEmail,
+            username: safeUsername,
+            displayName: (displayName || safeUsername).trim(),
+            role: 'Owner',
+            workspaceName: (workspaceName || 'AGF Studios').trim(),
+          };
+          localStorage.setItem('agf_drawer_user', JSON.stringify(session));
+
           setTimeout(() => {
-            onAuthSuccess({
-              id: 'usr-new',
-              email,
-              username: username || email.split('@')[0],
-              displayName: displayName || 'Studio User',
-              workspaceName: workspaceName || 'Mein Workspace',
-            });
+            onAuthSuccess(session);
             onNavigateRoute('dashboard');
-          }, 1200);
+          }, 900);
         } else {
-          const errData = await res.json().catch(() => ({}));
-          setErrorMessage(errData.error?.message || 'Registrierung fehlgeschlagen. Bitte versuche es erneut.');
+          setErrorMessage(
+            data.error?.message ||
+              'Registrierung fehlgeschlagen. Möglicherweise existiert diese E-Mail bereits.'
+          );
         }
       }
     } catch (err) {
-      // In case backend is not reached, provide friendly fallback
-      setErrorMessage('Verbindung zum Server fehlgeschlagen. Nutze den Demo-Gastmodus zum sofortigen Testen.');
+      setErrorMessage(
+        'Verbindung zum Backend-Server fehlgeschlagen. Stelle sicher, dass der Docker-Container läuft, oder nutze den Demo-Gastmodus.'
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDemoLogin = () => {
-    onAuthSuccess({
-      id: 'demo-user',
+    const demoSession: UserSession = {
+      id: 'demo-user-1',
       email: 'demo@agf-studios.de',
       username: 'lennard',
-      displayName: 'Lennard (AGF Studios)',
+      displayName: 'Lennard',
       role: 'Owner',
       workspaceName: 'AGF Studios',
-    });
+    };
+    localStorage.setItem('agf_drawer_user', JSON.stringify(demoSession));
+    onAuthSuccess(demoSession);
     onNavigateRoute('dashboard');
   };
 
@@ -129,7 +173,7 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
 
         <div className="flex items-center gap-2 text-xs text-neutral-500 font-mono">
           <KeyRound className="w-3.5 h-3.5 text-blue-400" />
-          <span>Argon2id & HttpOnly Sessions</span>
+          <span>Argon2id & Server-Session</span>
         </div>
       </header>
 
@@ -146,8 +190,8 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
             </h1>
             <p className="text-xs text-neutral-400">
               {mode === 'login'
-                ? 'Melde dich an, um auf deine Schränke und Kabel zuzugreifen.'
-                : 'Starte jetzt deine strukturierte Werkstatt- & Kabelverwaltung.'}
+                ? 'Melde dich an, um auf deine Schränke und Bestände zuzugreifen.'
+                : 'Erstelle dein persönliches SaaS-Konto für dein Team.'}
             </p>
           </div>
 
@@ -157,6 +201,7 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
               onClick={() => {
                 setMode('login');
                 setErrorMessage(null);
+                setSuccessMessage(null);
               }}
               className={`py-2 rounded-lg transition-colors ${
                 mode === 'login'
@@ -170,6 +215,7 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
               onClick={() => {
                 setMode('register');
                 setErrorMessage(null);
+                setSuccessMessage(null);
               }}
               className={`py-2 rounded-lg transition-colors ${
                 mode === 'register'
@@ -202,13 +248,13 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
               <>
                 <div>
                   <label className="block text-neutral-300 font-semibold mb-1">
-                    Benutzername
+                    Benutzername (alphanumerisch)
                   </label>
                   <div className="relative">
                     <User className="w-4 h-4 text-neutral-500 absolute left-3 top-2.5" />
                     <input
                       type="text"
-                      placeholder="z.B. lennard"
+                      placeholder="z.B. lennard_studios"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-[#0057FF]"
@@ -236,7 +282,7 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
 
                 <div>
                   <label className="block text-neutral-300 font-semibold mb-1">
-                    Erster Workspace-Name
+                    Name des ersten Workspaces
                   </label>
                   <div className="relative">
                     <Building className="w-4 h-4 text-neutral-500 absolute left-3 top-2.5" />
@@ -255,13 +301,13 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
 
             <div>
               <label className="block text-neutral-300 font-semibold mb-1">
-                E-Mail-Adresse
+                {mode === 'login' ? 'E-Mail oder Benutzername' : 'E-Mail-Adresse'}
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-neutral-500 absolute left-3 top-2.5" />
                 <input
-                  type="email"
-                  placeholder="name@beispiel.de"
+                  type={mode === 'login' ? 'text' : 'email'}
+                  placeholder={mode === 'login' ? 'name@beispiel.de oder benutzername' : 'name@beispiel.de'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-[#0057FF]"
@@ -278,7 +324,9 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
                 {mode === 'login' && (
                   <button
                     type="button"
-                    onClick={() => alert('Bitte kontaktiere deinen Workspace-Administrator oder konfiguriere SMTP für automatischen Passwort-Reset.')}
+                    onClick={() =>
+                      alert('Passwort-Reset: Bitte wende dich an deinen Administrator oder nutze die SMTP-Wiederherstellung.')
+                    }
                     className="text-[11px] text-[#0057FF] hover:underline"
                   >
                     Passwort vergessen?
@@ -288,15 +336,27 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
               <div className="relative">
                 <Lock className="w-4 h-4 text-neutral-500 absolute left-3 top-2.5" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-[#0057FF]"
+                  className="w-full pl-9 pr-9 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-[#0057FF]"
                   required
                   minLength={8}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-neutral-500 hover:text-neutral-300"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
+              {mode === 'register' && (
+                <p className="text-[10px] text-neutral-500 mt-1">
+                  Mind. 8 Zeichen mit mind. 1 Großbuchstabe, 1 Kleinbuchstabe und 1 Ziffer.
+                </p>
+              )}
             </div>
 
             <button
@@ -313,7 +373,7 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
           <div className="relative flex py-2 items-center">
             <div className="flex-grow border-t border-neutral-900" />
             <span className="shrink-0 px-2 text-[10px] uppercase font-mono text-neutral-500">
-              Oder ohne Registrierung
+              Oder als Demo testen
             </span>
             <div className="flex-grow border-t border-neutral-900" />
           </div>

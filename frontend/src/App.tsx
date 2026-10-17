@@ -41,12 +41,26 @@ export const App: React.FC = () => {
   };
 
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(parseCurrentRoute);
-  const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
+    try {
+      const saved = localStorage.getItem('agf_drawer_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
 
   // Dashboard Sub-View State
   const [activeView, setActiveView] = useState<ActiveView>('overview');
   const [selectedCable, setSelectedCable] = useState<CableItem | null>(null);
-  const [isLightMode, setIsLightMode] = useState<boolean>(false);
+  const [isLightMode, setIsLightMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('agf_drawer_theme');
+      return saved === 'light';
+    } catch (e) {
+      return false;
+    }
+  });
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Data states
@@ -85,6 +99,37 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Synchronize theme with DOM element class and localStorage
+  useEffect(() => {
+    if (isLightMode) {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    }
+    localStorage.setItem('agf_drawer_theme', isLightMode ? 'light' : 'dark');
+  }, [isLightMode]);
+
+  const handleToggleLightMode = (mode?: 'dark' | 'light') => {
+    if (mode) {
+      setIsLightMode(mode === 'light');
+    } else {
+      setIsLightMode((prev) => !prev);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch (e) {
+      // Ignore network errors
+    }
+    localStorage.removeItem('agf_drawer_user');
+    setCurrentUser(null);
+    navigateRoute('login');
+  };
+
   // Try fetching from backend API if available
   useEffect(() => {
     const fetchBackendData = async () => {
@@ -93,12 +138,15 @@ export const App: React.FC = () => {
         if (meRes.ok) {
           const meData = await meRes.json();
           if (meData.user) {
-            setCurrentUser({
+            const session: UserSession = {
               id: meData.user.id,
               email: meData.user.email,
               username: meData.user.username,
               displayName: meData.user.displayName,
-            });
+              workspaceName: meData.workspaces?.[0]?.name || 'AGF Studios',
+            };
+            setCurrentUser(session);
+            localStorage.setItem('agf_drawer_user', JSON.stringify(session));
           }
         }
 
@@ -469,6 +517,9 @@ export const App: React.FC = () => {
             storageCount: storageLocations.length,
           }}
           currentWorkspace={currentUser?.workspaceName || 'AGF Studios'}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          isLightMode={isLightMode}
         />
       </div>
 
@@ -481,7 +532,7 @@ export const App: React.FC = () => {
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenAddModal={() => setIsAddCableModalOpen(true)}
           isLightMode={isLightMode}
-          onToggleLightMode={() => setIsLightMode(!isLightMode)}
+          onToggleLightMode={() => handleToggleLightMode()}
           onOpenCatalogModal={() => {
             setCatalogSide('A');
             setIsCatalogOpen(true);
@@ -503,6 +554,7 @@ export const App: React.FC = () => {
                 setSearchQuery(q);
                 setActiveView('cable-finder');
               }}
+              isLightMode={isLightMode}
             />
           )}
 
@@ -525,6 +577,7 @@ export const App: React.FC = () => {
               onOpenReturnModal={(unit) => handleOpenReturnModal(unit, selectedCable.name)}
               onUpdateUnitStatus={handleUpdateUnitStatus}
               onAddUnit={handleAddUnitToCable}
+              isLightMode={isLightMode}
             />
           )}
 
@@ -533,6 +586,7 @@ export const App: React.FC = () => {
               storageLocations={storageLocations}
               cables={cables}
               onSelectCable={handleSelectCable}
+              isLightMode={isLightMode}
             />
           )}
 
@@ -541,6 +595,7 @@ export const App: React.FC = () => {
               cables={cables}
               onOpenReturnModal={handleOpenReturnModal}
               onSelectCable={handleSelectCable}
+              isLightMode={isLightMode}
             />
           )}
 
@@ -549,12 +604,25 @@ export const App: React.FC = () => {
               cables={cables}
               onSelectCable={handleSelectCable}
               onOpenAddModal={() => setIsAddCableModalOpen(true)}
+              isLightMode={isLightMode}
             />
           )}
 
-          {activeView === 'movements' && <MovementsView movements={movements} />}
+          {activeView === 'movements' && (
+            <MovementsView
+              movements={movements}
+              isLightMode={isLightMode}
+            />
+          )}
 
-          {activeView === 'settings' && <SettingsView />}
+          {activeView === 'settings' && (
+            <SettingsView
+              currentUser={currentUser}
+              isLightMode={isLightMode}
+              onToggleLightMode={handleToggleLightMode}
+              onLogout={handleLogout}
+            />
+          )}
 
           {activeView === 'design-system' && <DesignSystemView />}
         </main>
@@ -567,6 +635,7 @@ export const App: React.FC = () => {
             if (view !== 'cable-detail') setSelectedCable(null);
           }}
           onOpenAddModal={() => setIsAddCableModalOpen(true)}
+          isLightMode={isLightMode}
         />
       </div>
 
