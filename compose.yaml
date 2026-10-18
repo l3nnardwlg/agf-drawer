@@ -1,12 +1,64 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: agf-drawer-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agf_drawer}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-agf_drawer}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agf_network
+
   drawer:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agf-drawer-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      DATA_DIR: /app/data
-    volumes:
-      - drawer_data:/app/data
-    restart: unless-stopped
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-agf_drawer}?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:-changeme-production-session-secret-at-least-32-chars}
+      CSRF_SECRET: ${CSRF_SECRET:-changeme-production-csrf-secret-at-least-32-chars}
+      COOKIE_SECRET: ${COOKIE_SECRET:-changeme-production-cookie-secret-at-least-32-chars}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-604800}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-AGF Drawer <noreply@agf-studios.com>}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - agf_network
+
 volumes:
-  drawer_data:
+  postgres_data:
+
+networks:
+  agf_network:
+    driver: bridge

@@ -1,0 +1,401 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum LocationType {
+  ROOM
+  CABINET
+  DRAWER
+  SHELF
+  BOX
+  RACK
+  COMPARTMENT
+  OTHER
+}
+
+enum ConnectorFamily {
+  USB
+  VIDEO
+  NETWORKING
+  AUDIO
+  POWER
+  INTERNAL
+  SERIAL
+  OTHER
+}
+
+enum ConnectorGender {
+  MALE
+  FEMALE
+  NOT_APPLICABLE
+  UNIVERSAL
+}
+
+enum InventoryCategory {
+  CABLE
+  ADAPTER
+  ELECTRONICS
+  MICROCONTROLLER
+  SENSOR
+  NETWORK
+  DEVICE
+  TOOL
+  SPARE_PART
+  GENERAL
+}
+
+enum UnitStatus {
+  STORED
+  IN_USE
+  LOANED
+  MISSING
+  RETIRED
+}
+
+enum MovementAction {
+  ITEM_CREATED
+  ITEM_UPDATED
+  ITEM_ARCHIVED
+  UNIT_ADDED
+  UNIT_MOVED
+  UNIT_ASSIGNED
+  UNIT_RETURNED
+  UNIT_LOANED
+  UNIT_MARKED_MISSING
+  UNIT_RETIRED
+  LOCATION_CREATED
+  LOCATION_MOVED
+  LOCATION_DELETED
+}
+
+model User {
+  id                String    @id @default(uuid()) @db.Uuid
+  username          String    @unique
+  email             String    @unique
+  passwordHash      String
+  displayName       String
+  avatarUrl         String?
+  preferredLanguage String    @default("en")
+  preferredTheme    String    @default("dark")
+  timezone          String    @default("UTC")
+  emailVerified     Boolean   @default(false)
+  emailVerifiedAt   DateTime?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastLoginAt       DateTime?
+
+  sessions          Session[]
+  verificationTokens EmailVerificationToken[]
+  resetTokens       PasswordResetToken[]
+  workspaceMemberships WorkspaceMember[]
+  invitationsCreated WorkspaceInvitation[]
+  createdItems      InventoryItem[]
+  assignmentsMade   CableAssignment[]
+  movements         InventoryMovement[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  tokenHash    String    @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  lastActiveAt DateTime  @default(now())
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model Workspace {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  ownerId     String   @db.Uuid
+  isArchived  Boolean  @default(false)
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members          WorkspaceMember[]
+  invitations      WorkspaceInvitation[]
+  storageLocations StorageLocation[]
+  inventoryItems   InventoryItem[]
+  inventoryUnits   InventoryUnit[]
+  customConnectors Connector[]
+  assignments      CableAssignment[]
+  movements        InventoryMovement[]
+
+  @@index([ownerId])
+  @@index([slug])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  userId      String    @db.Uuid
+  role        Role      @default(VIEWER)
+  joinedAt    DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+model WorkspaceInvitation {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  email       String
+  role        Role      @default(VIEWER)
+  tokenHash   String    @unique
+  invitedById String    @db.Uuid
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, email])
+  @@index([tokenHash])
+  @@map("workspace_invitations")
+}
+
+model StorageLocation {
+  id            String          @id @default(uuid()) @db.Uuid
+  workspaceId   String          @db.Uuid
+  name          String
+  type          LocationType
+  parentId      String?         @db.Uuid
+  description   String?
+  referenceCode String?
+  sortOrder     Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent        StorageLocation? @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children      StorageLocation[] @relation("LocationHierarchy")
+  units         InventoryUnit[]
+
+  @@index([workspaceId, parentId])
+  @@index([workspaceId, name])
+  @@map("storage_locations")
+}
+
+model Connector {
+  id          String          @id @default(uuid()) @db.Uuid
+  workspaceId String?         @db.Uuid
+  name        String
+  family      ConnectorFamily
+  gender      ConnectorGender @default(NOT_APPLICABLE)
+  description String?
+  aliases     String[]        @default([])
+  protocols   String[]        @default([])
+  isCustom    Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  workspace   Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  endpoints   CableEndpoint[]
+
+  @@index([workspaceId, name])
+  @@index([family])
+  @@map("connectors")
+}
+
+model InventoryItem {
+  id                String            @id @default(uuid()) @db.Uuid
+  workspaceId       String            @db.Uuid
+  name              String
+  description       String?
+  category          InventoryCategory
+  itemType          String
+  manufacturer      String?
+  model             String?
+  sku               String?
+  internalReference String?
+  tags              String[]          @default([])
+  metadata          Json              @default("{}")
+  isArchived        Boolean           @default(false)
+  createdById       String?           @db.Uuid
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  archivedAt        DateTime?
+
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy         User?             @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  cableSpec         CableSpecification?
+  units             InventoryUnit[]
+  movements         InventoryMovement[]
+
+  @@index([workspaceId, category])
+  @@index([workspaceId, name])
+  @@index([workspaceId, isArchived])
+  @@map("inventory_items")
+}
+
+model CableSpecification {
+  id             String          @id @default(uuid()) @db.Uuid
+  itemId         String          @unique @db.Uuid
+  cableStandard  String?
+  color          String?
+  lengthCm       Int?
+  gaugeAwg       Int?
+  isShielded     Boolean         @default(false)
+  isBreakout     Boolean         @default(false)
+  notes          String?
+  specifications Json            @default("{}")
+
+  item           InventoryItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  endpoints      CableEndpoint[]
+
+  @@index([itemId])
+  @@index([color])
+  @@index([lengthCm])
+  @@map("cable_specifications")
+}
+
+model CableEndpoint {
+  id            String          @id @default(uuid()) @db.Uuid
+  cableSpecId   String          @db.Uuid
+  position      String
+  connectorId   String?         @db.Uuid
+  connectorName String
+  gender        ConnectorGender @default(MALE)
+  pinout        String?
+  notes         String?
+
+  cableSpec     CableSpecification @relation(fields: [cableSpecId], references: [id], onDelete: Cascade)
+  connector     Connector?         @relation(fields: [connectorId], references: [id], onDelete: SetNull)
+
+  @@index([cableSpecId])
+  @@index([connectorName])
+  @@map("cable_endpoints")
+}
+
+model InventoryUnit {
+  id                String          @id @default(uuid()) @db.Uuid
+  itemId            String          @db.Uuid
+  workspaceId       String          @db.Uuid
+  unitIdentifier    String?
+  serialNumber      String?
+  assetTag          String?
+  status            UnitStatus      @default(STORED)
+  storageLocationId String?         @db.Uuid
+  usageLocation     String?
+  notes             String?
+  version           Int             @default(1)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  item              InventoryItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  storageLocation   StorageLocation? @relation(fields: [storageLocationId], references: [id], onDelete: SetNull)
+  assignments       CableAssignment[]
+  movements         InventoryMovement[]
+
+  @@index([workspaceId, itemId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, storageLocationId])
+  @@map("inventory_units")
+}
+
+model CableAssignment {
+  id             String        @id @default(uuid()) @db.Uuid
+  unitId         String        @db.Uuid
+  workspaceId    String        @db.Uuid
+  usageLocation  String
+  assignedDevice String?
+  purpose        String?
+  notes          String?
+  assignedById   String        @db.Uuid
+  assignedAt     DateTime      @default(now())
+  returnedAt     DateTime?
+
+  unit           InventoryUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignedBy     User          @relation(fields: [assignedById], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, unitId])
+  @@index([workspaceId, returnedAt])
+  @@map("cable_assignments")
+}
+
+model InventoryMovement {
+  id            String         @id @default(uuid()) @db.Uuid
+  workspaceId   String         @db.Uuid
+  itemId        String?        @db.Uuid
+  unitId        String?        @db.Uuid
+  actorId       String?        @db.Uuid
+  action        MovementAction
+  previousState Json?
+  newState      Json?
+  reason        String?
+  timestamp     DateTime       @default(now())
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  item          InventoryItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  unit          InventoryUnit? @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  actor         User?          @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, itemId])
+  @@index([workspaceId, unitId])
+  @@index([workspaceId, timestamp])
+  @@map("inventory_movements")
+}
