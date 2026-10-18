@@ -7,6 +7,9 @@ import { LandingPageView } from './views/LandingPageView';
 import { FeaturesPageView } from './views/FeaturesPageView';
 import { PricingPageView } from './views/PricingPageView';
 import { AuthPageView } from './views/AuthPageView';
+import { ImpressumView } from './views/ImpressumView';
+import { DatenschutzView } from './views/DatenschutzView';
+import { AgbView } from './views/AgbView';
 
 // Dashboard Components
 import { Sidebar } from './components/Sidebar';
@@ -37,6 +40,9 @@ export const App: React.FC = () => {
     if (path === '/register') return 'register';
     if (path === '/features') return 'features';
     if (path === '/pricing') return 'pricing';
+    if (path === '/impressum') return 'impressum';
+    if (path === '/datenschutz') return 'datenschutz';
+    if (path === '/agb') return 'agb';
     return 'landing';
   };
 
@@ -86,6 +92,9 @@ export const App: React.FC = () => {
     else if (route === 'register') path = '/register';
     else if (route === 'features') path = '/features';
     else if (route === 'pricing') path = '/pricing';
+    else if (route === 'impressum') path = '/impressum';
+    else if (route === 'datenschutz') path = '/datenschutz';
+    else if (route === 'agb') path = '/agb';
 
     window.history.pushState({ route }, '', path);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -486,7 +495,35 @@ export const App: React.FC = () => {
     );
   }
 
-  // 4. Auth Pages (Login / Register)
+  // 4. Legal Compliance Pages
+  if (currentRoute === 'impressum') {
+    return (
+      <ImpressumView
+        onNavigateRoute={navigateRoute}
+        onOpenDashboard={() => navigateRoute('dashboard')}
+      />
+    );
+  }
+
+  if (currentRoute === 'datenschutz') {
+    return (
+      <DatenschutzView
+        onNavigateRoute={navigateRoute}
+        onOpenDashboard={() => navigateRoute('dashboard')}
+      />
+    );
+  }
+
+  if (currentRoute === 'agb') {
+    return (
+      <AgbView
+        onNavigateRoute={navigateRoute}
+        onOpenDashboard={() => navigateRoute('dashboard')}
+      />
+    );
+  }
+
+  // 5. Auth Pages (Login / Register)
   if (currentRoute === 'login' || currentRoute === 'register') {
     return (
       <AuthPageView
@@ -500,7 +537,21 @@ export const App: React.FC = () => {
     );
   }
 
-  // 5. SaaS Production Dashboard (/dashboard)
+  // 6. Production Route Guard: require authentication for /dashboard
+  if (currentRoute === 'dashboard' && !currentUser) {
+    return (
+      <AuthPageView
+        initialMode="login"
+        onNavigateRoute={navigateRoute}
+        onAuthSuccess={(session) => {
+          setCurrentUser(session);
+          navigateRoute('dashboard');
+        }}
+      />
+    );
+  }
+
+  // 7. SaaS Production Dashboard (/dashboard)
   return (
     <div className={`min-h-screen flex ${isLightMode ? 'bg-[#F9F9FB] text-neutral-900' : 'bg-black text-white'}`}>
       {/* Desktop Sidebar */}

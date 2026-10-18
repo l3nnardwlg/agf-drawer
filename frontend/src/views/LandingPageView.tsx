@@ -430,20 +430,26 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-6 text-xs text-neutral-400">
-            <button onClick={() => onNavigateRoute('features')} className="hover:text-white">
+            <button onClick={() => onNavigateRoute('features')} className="hover:text-white transition-colors">
               Funktionen
             </button>
-            <button onClick={() => onNavigateRoute('pricing')} className="hover:text-white">
+            <button onClick={() => onNavigateRoute('pricing')} className="hover:text-white transition-colors">
               Preise
             </button>
-            <a href="/docs" target="_blank" rel="noreferrer" className="hover:text-white">
+            <button onClick={() => onNavigateRoute('impressum')} className="hover:text-white transition-colors">
+              Impressum
+            </button>
+            <button onClick={() => onNavigateRoute('datenschutz')} className="hover:text-white transition-colors">
+              Datenschutz
+            </button>
+            <button onClick={() => onNavigateRoute('agb')} className="hover:text-white transition-colors">
+              AGB
+            </button>
+            <a href="/docs" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">
               OpenAPI 3.1
             </a>
-            <a href="https://github.com/l3nnardwlg/agf-drawer" target="_blank" rel="noreferrer" className="hover:text-white">
-              GitHub Repository
-            </a>
             <button onClick={onOpenDashboard} className="text-[#0057FF] hover:underline font-medium">
-              App / Dashboard
+              Dashboard
             </button>
           </div>
         </div>

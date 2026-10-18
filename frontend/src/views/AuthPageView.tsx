@@ -135,25 +135,11 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
       }
     } catch (err) {
       setErrorMessage(
-        'Verbindung zum Backend-Server fehlgeschlagen. Stelle sicher, dass der Docker-Container läuft, oder nutze den Demo-Gastmodus.'
+        'Verbindung zum Backend-Server fehlgeschlagen. Bitte prüfe deine Internetverbindung oder versuche es in wenigen Augenblicken erneut.'
       );
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleDemoLogin = () => {
-    const demoSession: UserSession = {
-      id: 'demo-user-1',
-      email: 'demo@agf-studios.de',
-      username: 'lennard',
-      displayName: 'Lennard',
-      role: 'Owner',
-      workspaceName: 'AGF Studios',
-    };
-    localStorage.setItem('agf_drawer_user', JSON.stringify(demoSession));
-    onAuthSuccess(demoSession);
-    onNavigateRoute('dashboard');
   };
 
   return (
@@ -368,31 +354,19 @@ export const AuthPageView: React.FC<AuthPageViewProps> = ({
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Quick Demo Access Divider */}
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-neutral-900" />
-            <span className="shrink-0 px-2 text-[10px] uppercase font-mono text-neutral-500">
-              Oder als Demo testen
-            </span>
-            <div className="flex-grow border-t border-neutral-900" />
-          </div>
-
-          {/* One-Click Demo Mode Button */}
-          <button
-            onClick={handleDemoLogin}
-            type="button"
-            className="w-full py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800/80 text-xs font-semibold text-neutral-200 hover:text-white transition-all flex items-center justify-center gap-2"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-            <span>Sofort als Demo-Gast starten (1-Klick)</span>
-          </button>
         </div>
       </div>
 
       {/* Footer */}
-      <footer className="p-6 text-center text-xs text-neutral-500 relative z-10">
-        AGF Studios • Sichere Authentifizierung mit Argon2id & Session Cookies
+      <footer className="p-6 text-center text-xs text-neutral-500 relative z-10 flex flex-col sm:flex-row items-center justify-between max-w-5xl mx-auto w-full gap-3 border-t border-neutral-900/60">
+        <div>© 2026 AGF-Studios GmbH. Alle Rechte vorbehalten.</div>
+        <div className="flex items-center gap-4 text-xs font-mono">
+          <button onClick={() => onNavigateRoute('impressum')} className="hover:text-white transition-colors">Impressum</button>
+          <span>•</span>
+          <button onClick={() => onNavigateRoute('datenschutz')} className="hover:text-white transition-colors">Datenschutz</button>
+          <span>•</span>
+          <button onClick={() => onNavigateRoute('agb')} className="hover:text-white transition-colors">AGB</button>
+        </div>
       </footer>
     </div>
   );

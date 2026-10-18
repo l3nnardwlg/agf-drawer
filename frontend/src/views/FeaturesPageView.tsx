@@ -190,8 +190,16 @@ export const FeaturesPageView: React.FC<FeaturesPageViewProps> = ({
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-neutral-900 bg-black py-8 px-6 text-center text-xs text-neutral-500">
-        AGF Drawer • Gebaut für Präzision und Langlebigkeit.
+      <footer className="border-t border-neutral-900 bg-black py-8 px-6 text-xs text-neutral-500">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>© 2026 AGF-Studios GmbH • Gebaut für Präzision und Langlebigkeit.</div>
+          <div className="flex flex-wrap items-center gap-6 font-mono text-xs">
+            <button onClick={() => onNavigateRoute('impressum')} className="hover:text-white transition-colors">Impressum</button>
+            <button onClick={() => onNavigateRoute('datenschutz')} className="hover:text-white transition-colors">Datenschutz</button>
+            <button onClick={() => onNavigateRoute('agb')} className="hover:text-white transition-colors">AGB</button>
+            <button onClick={() => onNavigateRoute('pricing')} className="hover:text-white transition-colors">Preise</button>
+          </div>
+        </div>
       </footer>
     </div>
   );

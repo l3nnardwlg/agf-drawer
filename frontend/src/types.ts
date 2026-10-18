@@ -80,7 +80,10 @@ export type AppRoute =
   | 'pricing'
   | 'login'
   | 'register'
-  | 'dashboard';
+  | 'dashboard'
+  | 'impressum'
+  | 'datenschutz'
+  | 'agb';
 
 export type ActiveView =
   | 'overview'
